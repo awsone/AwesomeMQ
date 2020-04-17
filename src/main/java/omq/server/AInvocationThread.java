@@ -7,14 +7,18 @@ import java.util.Properties;
 import omq.common.broker.Broker;
 import omq.common.message.Request;
 import omq.common.message.Response;
+import omq.common.util.ParameterQueue;
 import omq.common.util.Serializer;
 import omq.exception.OmqException;
+import omq.exception.SerializerException;
 
 import org.apache.log4j.Logger;
 
 import com.rabbitmq.client.AMQP.BasicProperties;
 import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.ConsumerCancelledException;
 import com.rabbitmq.client.QueueingConsumer;
+import com.rabbitmq.client.ShutdownSignalException;
 import com.rabbitmq.client.QueueingConsumer.Delivery;
 
 public abstract class AInvocationThread extends Thread {
@@ -43,6 +47,46 @@ public abstract class AInvocationThread extends Thread {
 		this.env = obj.getEnv();
 		this.broker = obj.getBroker();
 		this.serializer = broker.getSerializer();
+	}
+
+	@Override
+	public void run() {
+		while (!killed) {
+			try {
+				// Get the delivery
+				Delivery delivery = consumer.nextDelivery();
+
+				executeTask(delivery);
+
+			} catch (InterruptedException i) {
+				logger.error(i);
+			} catch (ShutdownSignalException e) {
+				logger.error(e);
+				try {
+					if (channel.isOpen()) {
+						channel.close();
+					}
+					startQueues();
+				} catch (Exception e1) {
+					try {
+						long milis = Long.parseLong(env.getProperty(ParameterQueue.RETRY_TIME_CONNECTION, "2000"));
+						Thread.sleep(milis);
+					} catch (InterruptedException e2) {
+						logger.error(e2);
+					}
+					logger.error(e1);
+				}
+			} catch (ConsumerCancelledException e) {
+				logger.error(e);
+			} catch (SerializerException e) {
+				logger.error(e);
+			} catch (Exception e) {
+				e.printStackTrace();
+				logger.error(e);
+			}
+
+		}
+		logger.info("ObjectMQ ('" + obj.getRef() + "') InvocationThread " + Thread.currentThread().getId() + " is killed");
 	}
 
 	@Override

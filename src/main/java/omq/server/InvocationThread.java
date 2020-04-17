@@ -1,14 +1,10 @@
 package omq.server;
 
 import omq.common.util.ParameterQueue;
-import omq.exception.SerializerException;
 
 import org.apache.log4j.Logger;
 
-import com.rabbitmq.client.ConsumerCancelledException;
 import com.rabbitmq.client.QueueingConsumer;
-import com.rabbitmq.client.QueueingConsumer.Delivery;
-import com.rabbitmq.client.ShutdownSignalException;
 
 /**
  * An invocationThread waits for requests an invokes them.
@@ -24,46 +20,6 @@ public class InvocationThread extends AInvocationThread {
 
 	public InvocationThread(RemoteObject obj) throws Exception {
 		super(obj);
-	}
-
-	@Override
-	public void run() {
-		while (!killed) {
-			try {
-				// Get the delivery
-				Delivery delivery = consumer.nextDelivery();
-
-				executeTask(delivery);
-
-			} catch (InterruptedException i) {
-				logger.error(i);
-			} catch (ShutdownSignalException e) {
-				logger.error(e);
-				try {
-					if (channel.isOpen()) {
-						channel.close();
-					}
-					startQueues();
-				} catch (Exception e1) {
-					try {
-						long milis = Long.parseLong(env.getProperty(ParameterQueue.RETRY_TIME_CONNECTION, "2000"));
-						Thread.sleep(milis);
-					} catch (InterruptedException e2) {
-						logger.error(e2);
-					}
-					logger.error(e1);
-				}
-			} catch (ConsumerCancelledException e) {
-				logger.error(e);
-			} catch (SerializerException e) {
-				logger.error(e);
-			} catch (Exception e) {
-				e.printStackTrace();
-				logger.error(e);
-			}
-
-		}
-		logger.info("ObjectMQ ('" + obj.getRef() + "') InvocationThread " + Thread.currentThread().getId() + " is killed");
 	}
 
 	/**

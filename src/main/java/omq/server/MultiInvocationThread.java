@@ -6,6 +6,8 @@ import org.apache.log4j.Logger;
 
 import com.rabbitmq.client.QueueingConsumer;
 
+
+//TODO Should MIT have more than one single thread?? -> Maybe ParameterQueue.NUM_THREADS_MULTI?
 public class MultiInvocationThread extends AInvocationThread {
 
 	private static final Logger logger = Logger.getLogger(MultiInvocationThread.class.getName());
