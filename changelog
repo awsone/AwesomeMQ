@@ -1,0 +1,4 @@
+0.5.6
+-----
+Broker's channel synchronized. When the broker's channel gets closed it will be detected and a new one will be created.
+It only shows an error log with the information.
