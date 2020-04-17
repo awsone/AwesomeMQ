@@ -11,15 +11,8 @@ import java.util.Properties;
 import omq.Remote;
 import omq.common.broker.Broker;
 import omq.common.util.ParameterQueue;
-import omq.exception.SerializerException;
 
 import org.apache.log4j.Logger;
-
-import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.ConsumerCancelledException;
-import com.rabbitmq.client.QueueingConsumer;
-import com.rabbitmq.client.QueueingConsumer.Delivery;
-import com.rabbitmq.client.ShutdownSignalException;
 
 /**
  * A RemoteObject when it's started will be waiting for requests and will invoke
@@ -31,21 +24,17 @@ import com.rabbitmq.client.ShutdownSignalException;
  * @author Sergi Toda <sergi.toda@estudiants.urv.cat>
  * 
  */
-public abstract class RemoteObject extends Thread implements Remote {
+public abstract class RemoteObject implements Remote {
 
 	private static final long serialVersionUID = -1778953938739846450L;
-	private static final String multi = "multi#";
 	private static final Logger logger = Logger.getLogger(RemoteObject.class.getName());
 
+	private String reference;
 	private String UID;
 	private Properties env;
 	private transient Broker broker;
-	private transient String multiQueue;
-	private transient RemoteWrapper remoteWrapper;
+	private transient RemoteThreadPool pool;
 	private transient Map<String, List<Class<?>>> params;
-	private transient Channel channel;
-	private transient QueueingConsumer consumer;
-	private transient boolean killed = false;
 
 	private static final Map<String, Class<?>> primitiveClasses = new HashMap<String, Class<?>>();
 
@@ -57,9 +46,6 @@ public abstract class RemoteObject extends Thread implements Remote {
 		primitiveClasses.put("long", Long.class);
 		primitiveClasses.put("float", Float.class);
 		primitiveClasses.put("double", Double.class);
-	}
-
-	public RemoteObject() {
 	}
 
 	/**
@@ -75,7 +61,7 @@ public abstract class RemoteObject extends Thread implements Remote {
 	 */
 	public void startRemoteObject(String reference, Broker broker, Properties env) throws Exception {
 		this.broker = broker;
-		this.UID = reference;
+		this.reference = reference;
 		this.env = env;
 
 		this.params = new HashMap<String, List<Class<?>>>();
@@ -89,54 +75,20 @@ public abstract class RemoteObject extends Thread implements Remote {
 
 		// Get num threads to use
 		int numThreads = Integer.parseInt(env.getProperty(ParameterQueue.NUM_THREADS, "1"));
-		this.remoteWrapper = new RemoteWrapper(this, numThreads, broker.getSerializer());
 
-		startQueues();
-
-		// Start this listener
-		this.start();
+		// Create the pool & start it
+		pool = new RemoteThreadPool(numThreads, this);
+		pool.startPool();
 	}
 
-	@Override
-	public void run() {
-		while (!killed) {
-			try {
-				Delivery delivery = consumer.nextDelivery();
-
-				logger.debug(UID + " has received a message, serializer: " + delivery.getProperties().getType());
-
-				remoteWrapper.notifyDelivery(delivery);
-			} catch (InterruptedException i) {
-				logger.error(i);
-			} catch (ShutdownSignalException e) {
-				logger.error(e);
-				try {
-					if (channel.isOpen()) {
-						channel.close();
-					}
-					startQueues();
-				} catch (Exception e1) {
-					try {
-						long milis = Long.parseLong(env.getProperty(ParameterQueue.RETRY_TIME_CONNECTION, "2000"));
-						Thread.sleep(milis);
-					} catch (InterruptedException e2) {
-						logger.error(e2);
-					}
-					logger.error(e1);
-				}
-			} catch (ConsumerCancelledException e) {
-				logger.error(e);
-			} catch (SerializerException e) {
-				logger.error(e);
-			} catch (Exception e) {
-				logger.error(e);
-			}
-		}
+	public void startRemoteObject(String reference, String UID, Broker broker, Properties env) throws Exception {
+		this.UID = UID;
+		startRemoteObject(reference, broker, env);
 	}
 
 	@Override
 	public String getRef() {
-		return UID;
+		return reference;
 	}
 
 	/**
@@ -146,11 +98,8 @@ public abstract class RemoteObject extends Thread implements Remote {
 	 *             - If an operation failed.
 	 */
 	public void kill() throws IOException {
-		logger.warn("Killing objectmq: " + this.getRef());
-		killed = true;
-		interrupt();
-		channel.close();
-		remoteWrapper.stopRemoteWrapper();
+		logger.info("Killing objectmq: " + this.getRef());
+		pool.kill();
 	}
 
 	/**
@@ -249,77 +198,24 @@ public abstract class RemoteObject extends Thread implements Remote {
 		return params.get(methodName);
 	}
 
-	public Channel getChannel() {
-		return channel;
+	public Broker getBroker() {
+		return broker;
 	}
 
-	/**
-	 * This method starts the queues using the information got in the
-	 * environment.
-	 * 
-	 * @throws Exception
-	 */
-	private void startQueues() throws Exception {
-		// Start channel
-		channel = broker.getNewChannel();
+	public RemoteThreadPool getPool() {
+		return pool;
+	}
 
-		/*
-		 * Default queue, Round Robin behaviour
-		 */
+	public Properties getEnv() {
+		return env;
+	}
 
-		// Get info about which exchange and queue will use
-		String exchange = env.getProperty(ParameterQueue.RPC_EXCHANGE, "");
-		String queue = UID;
-		String routingKey = UID;
+	public String getUID() {
+		return UID;
+	}
 
-		// RemoteObject default queue
-		boolean durable = Boolean.parseBoolean(env.getProperty(ParameterQueue.DURABLE_QUEUE, "false"));
-		boolean exclusive = Boolean.parseBoolean(env.getProperty(ParameterQueue.EXCLUSIVE_QUEUE, "false"));
-		boolean autoDelete = Boolean.parseBoolean(env.getProperty(ParameterQueue.AUTO_DELETE_QUEUE, "false"));
-
-		// Declares and bindings
-		if (!exchange.equalsIgnoreCase("")) { // Default exchange case
-			channel.exchangeDeclare(exchange, "direct");
-		}
-		channel.queueDeclare(queue, durable, exclusive, autoDelete, null);
-		if (!exchange.equalsIgnoreCase("")) { // Default exchange case
-			channel.queueBind(queue, exchange, routingKey);
-		}
-		logger.info("RemoteObject: " + UID + " declared direct exchange: " + exchange + ", Queue: " + queue + ", Durable: " + durable + ", Exclusive: "
-				+ exclusive + ", AutoDelete: " + autoDelete);
-
-		/*
-		 * Multi queue, exclusive per each instance
-		 */
-
-		// Get info about the multiQueue
-		String multiExchange = multi + UID;
-		multiQueue = env.getProperty(ParameterQueue.MULTI_QUEUE_NAME);
-
-		// Multi queue (exclusive queue per remoteObject)
-		boolean multiDurable = Boolean.parseBoolean(env.getProperty(ParameterQueue.DURABLE_MQUEUE, "false"));
-		boolean multiExclusive = Boolean.parseBoolean(env.getProperty(ParameterQueue.EXCLUSIVE_MQUEUE, "true"));
-		boolean multiAutoDelete = Boolean.parseBoolean(env.getProperty(ParameterQueue.AUTO_DELETE_MQUEUE, "true"));
-
-		// Declares and bindings
-		channel.exchangeDeclare(multiExchange, "fanout");
-		if (multiQueue == null) {
-			multiQueue = channel.queueDeclare().getQueue();
-		} else {
-			channel.queueDeclare(multiQueue, multiDurable, multiExclusive, multiAutoDelete, null);
-		}
-		channel.queueBind(multiQueue, multiExchange, "");
-		logger.info("RemoteObject: " + UID + " declared fanout exchange: " + multiExchange + ", Queue: " + multiQueue + ", Durable: " + multiDurable
-				+ ", Exclusive: " + multiExclusive + ", AutoDelete: " + multiAutoDelete);
-
-		/*
-		 * Consumer
-		 */
-
-		// Declare a new consumer
-		consumer = new QueueingConsumer(channel);
-		channel.basicConsume(queue, true, consumer);
-		channel.basicConsume(multiQueue, true, consumer);
+	public void setUID(String uID) {
+		UID = uID;
 	}
 
 }
