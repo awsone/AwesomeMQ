@@ -11,6 +11,7 @@ import org.apache.log4j.Logger;
 import omq.client.proxy.Proxymq;
 import omq.common.broker.Broker;
 import omq.common.util.ParameterQueue;
+import omq.server.MultiInvocationThread;
 
 import com.rabbitmq.client.AMQP.BasicProperties;
 import com.rabbitmq.client.Channel;
@@ -34,7 +35,7 @@ public class ResponseListener extends Thread {
 	private Channel channel;
 	private QueueingConsumer consumer;
 	private boolean killed = false;
-	private Map<String, Map<String, byte[]>> results;
+	private Map<String, Map<String, IResponseWrapper>> results;
 	private Properties env;
 
 	/**
@@ -48,7 +49,7 @@ public class ResponseListener extends Thread {
 		env = broker.getEnvironment();
 
 		// Init the hashtable (it's concurrent)
-		results = new Hashtable<String, Map<String, byte[]>>();
+		results = new Hashtable<String, Map<String, IResponseWrapper>>();
 
 		startRPCQueue();
 	}
@@ -69,17 +70,31 @@ public class ResponseListener extends Thread {
 
 				// Get the response with its uid
 				uid_request = delivery.getProperties().getCorrelationId();
+				String type = delivery.getProperties().getType();
+
 				logger.debug("Response received -> proxy reference: " + props.getAppId() + ", corrId: " + uid_request);
 
 				// Stores the new response
-				Map<String, byte[]> proxyResults = results.get(props.getAppId());
+				Map<String, IResponseWrapper> proxyResults = results.get(props.getAppId());
 
-				// Put the result into the proxy results and notify him
-				synchronized (proxyResults) {
-					// If we haven't received this response before, we store it
-					if (!proxyResults.containsKey(uid_request)) {
-						proxyResults.put(uid_request, delivery.getBody());
-						proxyResults.notifyAll();
+				// Check whether the response is multi or not
+				if (MultiInvocationThread.TYPE.equals(type)) {
+					IResponseWrapper wrap = null;
+					if (proxyResults.containsKey(uid_request) && (wrap = proxyResults.get(uid_request)) != null) {
+						wrap.setResult(delivery.getBody());
+					} else if (!proxyResults.containsKey(uid_request)) {
+						wrap = new MultiResponseWrapper(delivery.getBody());
+						proxyResults.put(uid_request, wrap);
+					}
+				} else {
+					// Put the result into the proxy results and notify him
+					synchronized (proxyResults) {
+						// If we haven't received this response before, we store
+						// it
+						if (!proxyResults.containsKey(uid_request)) {
+							proxyResults.put(uid_request, new ResponseWrapper(delivery.getBody()));
+							proxyResults.notifyAll();
+						}
 					}
 				}
 			} catch (InterruptedException i) {

@@ -6,10 +6,16 @@ import org.apache.log4j.Logger;
 
 import com.rabbitmq.client.QueueingConsumer;
 
-
-//TODO Should MIT have more than one single thread?? -> Maybe ParameterQueue.NUM_THREADS_MULTI?
+/**
+ * 
+ * @author Sergi Toda <sergi.toda@estudiants.urv.cat>
+ * 
+ */
+// TODO Should MIT have more than one single thread?? -> Maybe
+// ParameterQueue.NUM_THREADS_MULTI?
 public class MultiInvocationThread extends AInvocationThread {
 
+	public static final String TYPE = "multiResponse";
 	private static final Logger logger = Logger.getLogger(MultiInvocationThread.class.getName());
 	private static final String multi = "multi#";
 
@@ -60,6 +66,11 @@ public class MultiInvocationThread extends AInvocationThread {
 		// Declare a new consumer
 		consumer = new QueueingConsumer(channel);
 		channel.basicConsume(multiQueue, autoAck, consumer);
+	}
+
+	@Override
+	public String getType() {
+		return TYPE;
 	}
 
 }

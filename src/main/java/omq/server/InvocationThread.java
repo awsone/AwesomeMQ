@@ -14,6 +14,7 @@ import com.rabbitmq.client.QueueingConsumer;
  */
 public class InvocationThread extends AInvocationThread {
 
+	public static final String TYPE = "normalResponse";
 	private static final Logger logger = Logger.getLogger(InvocationThread.class.getName());
 
 	// RemoteObject
@@ -87,5 +88,10 @@ public class InvocationThread extends AInvocationThread {
 		if (UID != null) {
 			channel.basicConsume(UID, autoAck, consumer);
 		}
+	}
+
+	@Override
+	public String getType() {
+		return TYPE;
 	}
 }
