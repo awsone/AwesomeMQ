@@ -24,7 +24,6 @@ public class Request implements Serializable {
 	private boolean async = false;
 
 	private transient boolean multi;
-	private transient int wait;
 	private transient long timeout;
 	private transient int retries;
 
@@ -77,15 +76,12 @@ public class Request implements Serializable {
 	 *            - Timeout for every retry
 	 * @param multi
 	 *            - If the method is multi
-	 * @param wait
-	 *            - If the method is multi how many responses will be listened
 	 * @return - new SyncRequest
 	 */
-	public static Request newSyncRequest(String id, String method, Object[] params, int retries, long timeout, boolean multi, int wait) {
+	public static Request newSyncRequest(String id, String method, Object[] params, int retries, long timeout, boolean multi) {
 		Request req = new Request(id, method, false, params, multi);
 		req.setRetries(retries);
 		req.setTimeout(timeout);
-		req.setWait(wait);
 		return req;
 	}
 
@@ -162,11 +158,4 @@ public class Request implements Serializable {
 		this.multi = multi;
 	}
 
-	public int getWait() {
-		return wait;
-	}
-
-	public void setWait(int wait) {
-		this.wait = wait;
-	}
 }

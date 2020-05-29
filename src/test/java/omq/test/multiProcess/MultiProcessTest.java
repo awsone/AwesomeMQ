@@ -85,18 +85,6 @@ public class MultiProcessTest {
 	}
 
 	@Test
-	public void fifoTest() {
-		int x = 10;
-		remoteNumber.setNumber(x);
-		int a = remoteNumber.getNumber();
-		assertEquals(0, a);
-		int b = remoteNumber.getNumber();
-		assertEquals(x, b);
-		remoteNumber.setNumber(0);
-		remoteNumber.setNumber(0);
-	}
-
-	@Test
 	public void multiTest() throws Exception {
 		int x = 10;
 		remoteNumber.setMultiNumber(x);

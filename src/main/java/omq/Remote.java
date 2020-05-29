@@ -16,9 +16,13 @@ import java.io.Serializable;
 public interface Remote extends Serializable {
 
 	/**
-	 * Returns the UID of a RemoteObject
+	 * Returns the reference of a RemoteObject
 	 * 
-	 * @return UID
+	 * @return reference
 	 */
 	public String getRef();
+
+	public String getUID();
+
+	public void setUID(String uID);
 }
