@@ -51,6 +51,23 @@ public class Broker {
 	private Map<String, Object> proxies = new Hashtable<String, Object>();
 	private Map<String, Object> multiProxies = new Hashtable<String, Object>();
 
+	public Broker() throws Exception {
+		Properties env = new Properties();
+
+		remoteObjs = new HashMap<String, RemoteObject>();
+		serializer = new Serializer(env);
+		environment = env;
+		connection = OmqConnectionFactory.getNewConnection(env);
+		channel = connection.createChannel();
+		addFaultTolerance();
+		if (!connection.isOpen() || !channel.isOpen()) {
+			if (connection.isOpen()) {
+				connection.close();
+			}
+			throw new InitBrokerException("The connection didn't work");
+		}
+	}
+
 	public Broker(Properties env) throws Exception {
 		// Load log4j configuration
 		// URL log4jResource = Broker.class.getResource("/log4j.xml");
