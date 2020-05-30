@@ -141,4 +141,9 @@ public class ParameterQueue {
 	 */
 	public static long DEFAULT_TIMEOUT = 1 * 1000 * 60;
 
+	public static String DEFAULT_USER = "guest";
+	public static String DEFAULT_PASS = "guest";
+	public static String DEFAULT_RABBIT_HOST = "localhost";
+	public static String DEFAULT_PORT = "5672";
+
 }

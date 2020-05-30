@@ -82,12 +82,12 @@ public class OmqConnectionFactory {
 	 */
 	public static Connection getNewConnection(Properties env) throws IOException, KeyManagementException, NoSuchAlgorithmException {
 		// Get login info of rabbitmq
-		String username = env.getProperty(ParameterQueue.USER_NAME);
-		String password = env.getProperty(ParameterQueue.USER_PASS);
+		String username = env.getProperty(ParameterQueue.USER_NAME, ParameterQueue.DEFAULT_USER);
+		String password = env.getProperty(ParameterQueue.USER_PASS, ParameterQueue.DEFAULT_PASS);
 
 		// Get host info of rabbimq (where it is)
-		String host = env.getProperty(ParameterQueue.RABBIT_HOST);
-		int port = Integer.parseInt(env.getProperty(ParameterQueue.RABBIT_PORT));
+		String host = env.getProperty(ParameterQueue.RABBIT_HOST, ParameterQueue.DEFAULT_RABBIT_HOST);
+		int port = Integer.parseInt(env.getProperty(ParameterQueue.RABBIT_PORT, ParameterQueue.DEFAULT_PORT));
 
 		boolean ssl = Boolean.parseBoolean(env.getProperty(ParameterQueue.ENABLE_SSL, "false"));
 
