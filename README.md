@@ -29,7 +29,7 @@ ObjectMQ  (<http://ast-deim.urv.cat/objectmq>) is a lightweight distributed obje
 Objects in ObjectMQ receive method calls as messages in incoming queues, and then reply the results (if necessary) to clients in their response queues. As we can see in the figure shown below, ObjectMQ creates a lightweight invocation layer on top of queues. When a client object invokes a method in a remote object, the message will be redirected to the appropriate queue thanks to the client stub. One or more servers can receive method invocations in an object pool.
 
 <p align="center">
-  <img width="500" src="https://raw.github.com/cloudspaces/objectmq/tree/master/src/main/resources/architecture.png">
+  <img width="500" src="https://raw.githubusercontent.com/cloudspaces/objectmq/master/src/main/resources/architecture.png">
 </p>
 
 There are two kind of invocation abstractions: unicast and multicast. Unicast remote invocations (client1, client2) are processed by just one server in the pool. This happens because all skeletons in the same object pool will consume messages from the same queue. In this case, the queue will load balance messages between the existing consumers.
@@ -60,7 +60,7 @@ We offer three main invocation abstractions: asynchronous, synchronous,and multi
 
 * @SyncMethod: This is a synchronous blocking remote call where the client publishes a message in the target object request Queue, blocking until a response is received in its own client response queue. This call can be configured with a timeout and a number of retries to trigger the exception if the result does not arrive.
 
-*@MultiMethod:  This is a one-to-many invocation from one client to many servers. This call can also be combined with @AsyncMethod or @SyncMethod. The former produces a non-blocking multiple invocation to many servers, whereas
+* @MultiMethod:  This is a one-to-many invocation from one client to many servers. This call can also be combined with @AsyncMethod or @SyncMethod. The former produces a non-blocking multiple invocation to many servers, whereas
 the latter produces a blocking multiple invocation that collects the results received from many servers in a determined timeout.
 
 # Fault Tolerance
